@@ -17,16 +17,15 @@
 <div class="card"><b>إضافة عمل</b>
 <label>العنوان</label><input id="w-title"><label>وصف قصير</label><input id="w-desc">
 <label>السعر (جنيه)</label><input id="w-price" inputmode="numeric">
-<label>ملف PDF</label><input id="w-file" type="file" accept="application/pdf">
+<label>رابط الـ PDF من Google Drive (المشاركة: أي شخص معه الرابط)</label><input id="w-link" dir="ltr" placeholder="https://drive.google.com/file/d/...">
 <button class="p" id="w-add">رفع ونشر</button><div class="msg" id="w-msg"></div></div>
 <h3>الطلبات</h3><div id="orders"></div>
 <h3>الأعمال</h3><div id="wl"></div>
 </div></div>
 <script type="module">
-import { db, storage, auth } from "./firebase-init.js";
+import { db, auth } from "./firebase-init.js";
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 import { collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, onSnapshot, orderBy, query, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
-import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-storage.js";
 const $=i=>document.getElementById(i);
 const esc=t=>{const d=document.createElement("div");d.textContent=t??"";return d.innerHTML};
 let started=false;
@@ -38,8 +37,7 @@ async function start(){
   onSnapshot(query(collection(db,"orders"),orderBy("createdAt","desc")),async snap=>{
     let h="";
     for(const d of snap.docs){const o=d.data(); let img="";
-      try{const u=await getDownloadURL(ref(storage,o.receiptPath));img=`<a href="${u}" target="_blank"><img src="${u}" style="max-width:100%;max-height:200px;border-radius:8px;margin:6px 0"></a>`}catch(e){}
-      h+=`<div class="card"><b>${esc(o.title)}</b> — ${esc(o.price)} ج.م <span class="tag ${o.status==="confirmed"?"ok":o.status==="rejected"?"bad":""}">${o.status}</span><br>${esc(o.name)} · ${esc(o.phone)}<br>${img}<br>`+
+      h+=`<div class="card"><b>${esc(o.title)}</b> — ${esc(o.price)} ج.م <span class="tag ${o.status==="confirmed"?"ok":o.status==="rejected"?"bad":""}">${o.status}</span><br>${esc(o.name)} · ${esc(o.phone)}<br>رقم العملية: <b dir="ltr">${esc(o.receiptPath)}</b><br>`+
       (o.status==="pending"?`<button class="p" data-ok="${d.id}" data-w="${o.workId}">تأكيد</button> <button class="s bad" data-no="${d.id}">رفض</button>`:"")+`</div>`;}
     $("orders").innerHTML=h||'<div class="note">مفيش طلبات.</div>';
     document.querySelectorAll("[data-ok]").forEach(b=>b.onclick=async()=>{
@@ -53,17 +51,16 @@ async function start(){
   });
 }
 $("ipa-save").onclick=async()=>{await setDoc(doc(db,"settings","main"),{ipa:$("ipa").value.trim()});$("ipa-save").textContent="تم ✓"};
+function driveDirect(u){const m=u.match(/\/d\/([\w-]+)/)||u.match(/[?&]id=([\w-]+)/);return m?"https://drive.google.com/uc?export=download&id="+m[1]:u}
 $("w-add").onclick=async()=>{
-  const t=$("w-title").value.trim(),p=$("w-price").value.trim(),f=$("w-file").files[0];
-  if(!t||!p||!f){$("w-msg").textContent="العنوان والسعر وPDF مطلوبين";return;}
-  $("w-msg").textContent="جاري الرفع...";
+  const t=$("w-title").value.trim(),p=$("w-price").value.trim(),l=$("w-link").value.trim();
+  if(!t||!p||!l){$("w-msg").textContent="العنوان والسعر ورابط الـ PDF مطلوبين";return;}
+  $("w-msg").textContent="جاري النشر...";
   try{
-    const id=doc(collection(db,"works")).id, r=ref(storage,`pdfs/${id}.pdf`);
-    await uploadBytes(r,f,{contentType:"application/pdf"});
-    const url=await getDownloadURL(r);
-    await setDoc(doc(db,"works_private",id),{pdfUrl:url});
+    const id=doc(collection(db,"works")).id;
+    await setDoc(doc(db,"works_private",id),{pdfUrl:driveDirect(l)});
     await setDoc(doc(db,"works",id),{title:t,desc:$("w-desc").value.trim(),price:p,createdAt:serverTimestamp()});
-    $("w-msg").textContent="تم النشر ✓";["w-title","w-desc","w-price","w-file"].forEach(i=>$(i).value="");
+    $("w-msg").textContent="تم النشر ✓";["w-title","w-desc","w-price","w-link"].forEach(i=>$(i).value="");
   }catch(e){$("w-msg").textContent="خطأ: "+(e.code||e.message)}
 };
 </script></body></html>

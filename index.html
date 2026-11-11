@@ -19,14 +19,13 @@
 <div class="note">٢) املأ بياناتك وارفع صورة إيصال التحويل:</div>
 <label>الاسم</label><input id="m-name" maxlength="80">
 <label>رقم الموبايل</label><input id="m-phone" inputmode="tel" maxlength="20">
-<label>صورة الإيصال</label><input id="m-rec" type="file" accept="image/*">
+<label>رقم عملية الإنستاباي (من إشعار التحويل)</label><input id="m-ref" dir="ltr" maxlength="40">
 <button class="p" id="m-send">إرسال الطلب</button> <button class="s" id="m-close">إغلاق</button>
 <div class="msg" id="m-msg"></div><div class="err" id="m-err"></div>
 </div></div>
 <script type="module">
-import { db, storage } from "./firebase-init.js";
+import { db } from "./firebase-init.js";
 import { collection, doc, getDoc, getDocs, setDoc, onSnapshot, orderBy, query, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
-import { ref, uploadBytes } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-storage.js";
 const $=i=>document.getElementById(i), COLORS=["#a8552d","#3b6e8f","#6b4e8c","#2e7d4f","#b0892f"];
 const esc=t=>{const d=document.createElement("div");d.textContent=t??"";return d.innerHTML};
 let works=[], ipa="", cur=null;
@@ -59,19 +58,17 @@ function openBuy(id){
 $("m-close").onclick=()=>$("modal").classList.add("hide");
 $("m-copy").onclick=()=>{navigator.clipboard?.writeText(ipa);$("m-copy").textContent="تم ✓"};
 $("m-send").onclick=async()=>{
-  const n=$("m-name").value.trim(),p=$("m-phone").value.trim(),f=$("m-rec").files[0];
+  const n=$("m-name").value.trim(),p=$("m-phone").value.trim(),f=$("m-ref").value.trim();
   $("m-err").textContent="";
-  if(!n||!p||!f){$("m-err").textContent="كمّل الاسم والموبايل وصورة الإيصال";return;}
-  if(f.size>5*1024*1024){$("m-err").textContent="الصورة أكبر من 5 ميجا";return;}
+  if(!n||!p||!f){$("m-err").textContent="كمّل الاسم والموبايل ورقم العملية";return;}
   $("m-send").disabled=true;
   try{
-    const oref=doc(collection(db,"orders")), path=`receipts/${oref.id}/receipt`;
-    await uploadBytes(ref(storage,path),f,{contentType:f.type});
+    const oref=doc(collection(db,"orders")), path=f;
     await setDoc(oref,{workId:cur.id,title:cur.title,price:String(cur.price),name:n,phone:p,receiptPath:path,status:"pending",createdAt:serverTimestamp()});
     localStorage.setItem("myOrders",JSON.stringify([oref.id,...myIds()]));
     const link=location.origin+location.pathname+"?order="+oref.id;
     $("m-msg").innerHTML="وصلنا طلبك ✓ احتفظ برابط المتابعة:<br><input readonly dir='ltr' value='"+link+"' onclick='this.select()'>";
   }catch(e){$("m-err").textContent="حصلت مشكلة، جرب تاني";$("m-send").disabled=false;console.error(e);}
 };
-init();
+init().catch(e=>{document.getElementById("shop").textContent="خطأ: "+(e.code||e.message);console.error(e)});
 </script></body></html>
