@@ -30,7 +30,7 @@ import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/fireba
 const $=i=>document.getElementById(i);
 const esc=t=>{const d=document.createElement("div");d.textContent=t??"";return d.innerHTML};
 let started=false;
-$("go").onclick=async()=>{try{await signInWithEmailAndPassword(auth,$("em").value,$("pw").value)}catch(e){$("lerr").textContent="بيانات غلط"}};
+$("go").onclick=async()=>{$("lerr").textContent="";try{await signInWithEmailAndPassword(auth,$("em").value.trim(),$("pw").value)}catch(e){$("lerr").textContent=e.code||e.message}};
 $("out").onclick=()=>signOut(auth);
 onAuthStateChanged(auth,u=>{$("login").classList.toggle("hide",!!u);$("panel").classList.toggle("hide",!u);if(u&&!started){started=true;start();}});
 async function start(){
@@ -57,11 +57,13 @@ $("w-add").onclick=async()=>{
   const t=$("w-title").value.trim(),p=$("w-price").value.trim(),f=$("w-file").files[0];
   if(!t||!p||!f){$("w-msg").textContent="العنوان والسعر وPDF مطلوبين";return;}
   $("w-msg").textContent="جاري الرفع...";
-  const id=doc(collection(db,"works")).id, r=ref(storage,`pdfs/${id}.pdf`);
-  await uploadBytes(r,f,{contentType:"application/pdf"});
-  const url=await getDownloadURL(r);
-  await setDoc(doc(db,"works_private",id),{pdfUrl:url});
-  await setDoc(doc(db,"works",id),{title:t,desc:$("w-desc").value.trim(),price:p,createdAt:serverTimestamp()});
-  $("w-msg").textContent="تم النشر ✓";["w-title","w-desc","w-price","w-file"].forEach(i=>$(i).value="");
+  try{
+    const id=doc(collection(db,"works")).id, r=ref(storage,`pdfs/${id}.pdf`);
+    await uploadBytes(r,f,{contentType:"application/pdf"});
+    const url=await getDownloadURL(r);
+    await setDoc(doc(db,"works_private",id),{pdfUrl:url});
+    await setDoc(doc(db,"works",id),{title:t,desc:$("w-desc").value.trim(),price:p,createdAt:serverTimestamp()});
+    $("w-msg").textContent="تم النشر ✓";["w-title","w-desc","w-price","w-file"].forEach(i=>$(i).value="");
+  }catch(e){$("w-msg").textContent="خطأ: "+(e.code||e.message)}
 };
 </script></body></html>
