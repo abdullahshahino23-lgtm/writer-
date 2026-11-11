@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>لوحة الإدارة</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css"></head>
+<body><div class="wrap">
+<h1>لوحة الإدارة</h1>
+<div id="login" class="card">
+<label>الإيميل</label><input id="em" type="email" dir="ltr">
+<label>كلمة السر</label><input id="pw" type="password" dir="ltr">
+<button class="p" id="go">دخول</button> <div class="err" id="lerr"></div></div>
+<div id="panel" class="hide">
+<button class="s" id="out">خروج</button>
+<div class="card"><b>عنوان إنستاباي</b><input id="ipa" dir="ltr" placeholder="name@instapay"><button class="s" id="ipa-save">حفظ</button></div>
+<div class="card"><b>إضافة عمل</b>
+<label>العنوان</label><input id="w-title"><label>وصف قصير</label><input id="w-desc">
+<label>السعر (جنيه)</label><input id="w-price" inputmode="numeric">
+<label>ملف PDF</label><input id="w-file" type="file" accept="application/pdf">
+<button class="p" id="w-add">رفع ونشر</button><div class="msg" id="w-msg"></div></div>
+<h3>الطلبات</h3><div id="orders"></div>
+<h3>الأعمال</h3><div id="wl"></div>
+</div></div>
+<script type="module">
+import { db, storage, auth } from "./firebase-init.js";
+import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+import { collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, onSnapshot, orderBy, query, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-storage.js";
+const $=i=>document.getElementById(i);
+const esc=t=>{const d=document.createElement("div");d.textContent=t??"";return d.innerHTML};
+let started=false;
+$("go").onclick=async()=>{try{await signInWithEmailAndPassword(auth,$("em").value,$("pw").value)}catch(e){$("lerr").textContent="بيانات غلط"}};
+$("out").onclick=()=>signOut(auth);
+onAuthStateChanged(auth,u=>{$("login").classList.toggle("hide",!!u);$("panel").classList.toggle("hide",!u);if(u&&!started){started=true;start();}});
+async function start(){
+  const s=await getDoc(doc(db,"settings","main")); if(s.exists())$("ipa").value=s.data().ipa||"";
+  onSnapshot(query(collection(db,"orders"),orderBy("createdAt","desc")),async snap=>{
+    let h="";
+    for(const d of snap.docs){const o=d.data(); let img="";
+      try{const u=await getDownloadURL(ref(storage,o.receiptPath));img=`<a href="${u}" target="_blank"><img src="${u}" style="max-width:100%;max-height:200px;border-radius:8px;margin:6px 0"></a>`}catch(e){}
+      h+=`<div class="card"><b>${esc(o.title)}</b> — ${esc(o.price)} ج.م <span class="tag ${o.status==="confirmed"?"ok":o.status==="rejected"?"bad":""}">${o.status}</span><br>${esc(o.name)} · ${esc(o.phone)}<br>${img}<br>`+
+      (o.status==="pending"?`<button class="p" data-ok="${d.id}" data-w="${o.workId}">تأكيد</button> <button class="s bad" data-no="${d.id}">رفض</button>`:"")+`</div>`;}
+    $("orders").innerHTML=h||'<div class="note">مفيش طلبات.</div>';
+    document.querySelectorAll("[data-ok]").forEach(b=>b.onclick=async()=>{
+      const pr=await getDoc(doc(db,"works_private",b.dataset.w));
+      await updateDoc(doc(db,"orders",b.dataset.ok),{status:"confirmed",downloadUrl:pr.data().pdfUrl});});
+    document.querySelectorAll("[data-no]").forEach(b=>b.onclick=()=>updateDoc(doc(db,"orders",b.dataset.no),{status:"rejected"}));
+  });
+  onSnapshot(query(collection(db,"works"),orderBy("createdAt","desc")),snap=>{
+    $("wl").innerHTML=snap.docs.map(d=>`<div class="card">${esc(d.data().title)} — ${esc(d.data().price)} ج.م <button class="s bad" data-del="${d.id}">حذف</button></div>`).join("");
+    document.querySelectorAll("[data-del]").forEach(b=>b.onclick=async()=>{if(confirm("حذف العمل؟")){await deleteDoc(doc(db,"works",b.dataset.del));await deleteDoc(doc(db,"works_private",b.dataset.del));}});
+  });
+}
+$("ipa-save").onclick=async()=>{await setDoc(doc(db,"settings","main"),{ipa:$("ipa").value.trim()});$("ipa-save").textContent="تم ✓"};
+$("w-add").onclick=async()=>{
+  const t=$("w-title").value.trim(),p=$("w-price").value.trim(),f=$("w-file").files[0];
+  if(!t||!p||!f){$("w-msg").textContent="العنوان والسعر وPDF مطلوبين";return;}
+  $("w-msg").textContent="جاري الرفع...";
+  const id=doc(collection(db,"works")).id, r=ref(storage,`pdfs/${id}.pdf`);
+  await uploadBytes(r,f,{contentType:"application/pdf"});
+  const url=await getDownloadURL(r);
+  await setDoc(doc(db,"works_private",id),{pdfUrl:url});
+  await setDoc(doc(db,"works",id),{title:t,desc:$("w-desc").value.trim(),price:p,createdAt:serverTimestamp()});
+  $("w-msg").textContent="تم النشر ✓";["w-title","w-desc","w-price","w-file"].forEach(i=>$(i).value="");
+};
+</script></body></html>

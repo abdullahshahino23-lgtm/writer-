@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>مكتبتي الأدبية</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css"></head>
+<body><div class="wrap">
+<h1>📚 مكتبتي الأدبية</h1>
+<p class="sub">كتب ومقالات ونصوص بصيغة PDF — ادفع بإنستاباي وحمّل بعد التأكيد</p>
+<div id="track"></div>
+<div id="shop"><div class="note">جاري التحميل...</div></div>
+<div id="mine"></div>
+</div>
+<div id="modal" class="hide"><div class="card" style="max-width:520px;margin:20px auto">
+<h3 id="m-title" style="margin-top:0"></h3>
+<div>المبلغ: <span class="price" id="m-price"></span></div>
+<div class="note">١) حوّل المبلغ على عنوان إنستاباي ده:</div>
+<div class="ipa"><b id="m-ipa"></b><button class="s" id="m-copy">نسخ</button></div>
+<div class="note">٢) املأ بياناتك وارفع صورة إيصال التحويل:</div>
+<label>الاسم</label><input id="m-name" maxlength="80">
+<label>رقم الموبايل</label><input id="m-phone" inputmode="tel" maxlength="20">
+<label>صورة الإيصال</label><input id="m-rec" type="file" accept="image/*">
+<button class="p" id="m-send">إرسال الطلب</button> <button class="s" id="m-close">إغلاق</button>
+<div class="msg" id="m-msg"></div><div class="err" id="m-err"></div>
+</div></div>
+<script type="module">
+import { db, storage } from "./firebase-init.js";
+import { collection, doc, getDoc, getDocs, setDoc, onSnapshot, orderBy, query, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+import { ref, uploadBytes } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-storage.js";
+const $=i=>document.getElementById(i), COLORS=["#a8552d","#3b6e8f","#6b4e8c","#2e7d4f","#b0892f"];
+const esc=t=>{const d=document.createElement("div");d.textContent=t??"";return d.innerHTML};
+let works=[], ipa="", cur=null;
+const myIds=()=>{try{return JSON.parse(localStorage.getItem("myOrders")||"[]")}catch(e){return[]}};
+
+async function init(){
+  try{const s=await getDoc(doc(db,"settings","main")); ipa=s.exists()?s.data().ipa:"";}catch(e){}
+  const snap=await getDocs(query(collection(db,"works"),orderBy("createdAt","desc")));
+  works=snap.docs.map(d=>({id:d.id,...d.data()}));
+  $("shop").innerHTML=works.length?works.map((w,i)=>`<div class="card work"><div class="cover" style="background:${COLORS[i%5]}">${esc(w.title)}</div><div style="flex:1"><h3>${esc(w.title)}</h3><p>${esc(w.desc)}</p><span class="price">${esc(w.price)} ج.م</span> <button class="p" data-buy="${w.id}" style="margin-inline-start:8px">اشتري</button></div></div>`).join(""):'<div class="card note">قريباً.. أول الأعمال.</div>';
+  document.querySelectorAll("[data-buy]").forEach(b=>b.onclick=()=>openBuy(b.dataset.buy));
+  const p=new URLSearchParams(location.search).get("order");
+  if(p) watch(p,"track"); 
+  const ids=myIds().filter(x=>x!==p); if(ids.length){$("mine").innerHTML="<h3>طلباتي على الجهاز ده</h3>"+ids.map(i=>`<div id="o-${i}"></div>`).join(""); ids.forEach(i=>watch(i,"o-"+i));}
+}
+function watch(id,target){
+  onSnapshot(doc(db,"orders",id),s=>{
+    const el=$(target); if(!s.exists()){el.innerHTML="";return;}
+    const o=s.data(), st=o.status;
+    el.innerHTML=`<div class="card"><b>${esc(o.title)}</b> <span class="tag ${st==="confirmed"?"ok":st==="rejected"?"bad":""}">${st==="confirmed"?"مؤكد":st==="rejected"?"مرفوض":"قيد المراجعة"}</span>`+
+    (st==="confirmed"&&o.downloadUrl?`<div style="margin-top:8px"><a class="p" href="${esc(o.downloadUrl)}" target="_blank" rel="noopener">تحميل PDF</a></div>`:"")+
+    (st==="rejected"?'<div class="note">لم نجد التحويل. تواصل معنا.</div>':"")+`</div>`;
+  });
+}
+function openBuy(id){
+  cur=works.find(w=>w.id===id); if(!cur)return;
+  $("m-title").textContent=cur.title;$("m-price").textContent=cur.price+" ج.م";$("m-ipa").textContent=ipa||"—";
+  $("m-msg").textContent="";$("m-err").textContent="";$("modal").classList.remove("hide");
+}
+$("m-close").onclick=()=>$("modal").classList.add("hide");
+$("m-copy").onclick=()=>{navigator.clipboard?.writeText(ipa);$("m-copy").textContent="تم ✓"};
+$("m-send").onclick=async()=>{
+  const n=$("m-name").value.trim(),p=$("m-phone").value.trim(),f=$("m-rec").files[0];
+  $("m-err").textContent="";
+  if(!n||!p||!f){$("m-err").textContent="كمّل الاسم والموبايل وصورة الإيصال";return;}
+  if(f.size>5*1024*1024){$("m-err").textContent="الصورة أكبر من 5 ميجا";return;}
+  $("m-send").disabled=true;
+  try{
+    const oref=doc(collection(db,"orders")), path=`receipts/${oref.id}/receipt`;
+    await uploadBytes(ref(storage,path),f,{contentType:f.type});
+    await setDoc(oref,{workId:cur.id,title:cur.title,price:String(cur.price),name:n,phone:p,receiptPath:path,status:"pending",createdAt:serverTimestamp()});
+    localStorage.setItem("myOrders",JSON.stringify([oref.id,...myIds()]));
+    const link=location.origin+location.pathname+"?order="+oref.id;
+    $("m-msg").innerHTML="وصلنا طلبك ✓ احتفظ برابط المتابعة:<br><input readonly dir='ltr' value='"+link+"' onclick='this.select()'>";
+  }catch(e){$("m-err").textContent="حصلت مشكلة، جرب تاني";$("m-send").disabled=false;console.error(e);}
+};
+init();
+</script></body></html>

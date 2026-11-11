@@ -1,0 +1,21 @@
+:root{--bg:#faf6ef;--card:#fff;--ink:#2a2118;--mut:#7a6c5c;--acc:#a8552d;--line:#e6dccb;--ok:#2e7d4f;--bad:#b3261e}
+@media (prefers-color-scheme:dark){:root{--bg:#1c1712;--card:#2a231b;--ink:#f3ebde;--mut:#b5a794;--acc:#e08a5c;--line:#41372b;--ok:#6fcf97;--bad:#f2837a}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Cairo,Tahoma,sans-serif;line-height:1.7}
+.wrap{max-width:640px;margin:0 auto;padding:16px}
+h1{font-size:22px;margin:8px 0 2px}.sub{color:var(--mut);margin:0 0 14px;font-size:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+.work{display:flex;gap:12px;align-items:center}
+.cover{width:64px;height:84px;border-radius:8px;flex:none;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:13px;text-align:center;padding:4px}
+.work h3{margin:0;font-size:16px}.work p{margin:2px 0 6px;color:var(--mut);font-size:13px}
+.price{color:var(--acc);font-weight:700}
+.p{background:var(--acc);color:#fff;border:0;border-radius:10px;padding:9px 16px;font:inherit;cursor:pointer;text-decoration:none;display:inline-block}
+.s{background:transparent;color:var(--acc);border:1px solid var(--acc);border-radius:10px;padding:6px 12px;font:inherit;cursor:pointer}
+.s.bad{color:var(--bad);border-color:var(--bad)}
+input,textarea{width:100%;padding:10px;margin:5px 0 10px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font:inherit}
+label{font-size:13px;color:var(--mut)}
+.ipa{background:var(--bg);border:1px dashed var(--acc);border-radius:10px;padding:10px;display:flex;justify-content:space-between;align-items:center;gap:8px;margin:8px 0;direction:ltr}
+.tag{font-size:12px;padding:2px 8px;border-radius:20px;border:1px solid var(--line)}
+.tag.ok{color:var(--ok);border-color:var(--ok)}.tag.bad{color:var(--bad);border-color:var(--bad)}
+.hide{display:none}.msg{color:var(--ok);font-size:14px;margin:6px 0}.err{color:var(--bad);font-size:14px}.note{font-size:12px;color:var(--mut)}
+#modal{position:fixed;inset:0;background:rgba(0,0,0,.5);overflow:auto;padding:16px}

@@ -1,0 +1,21 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAdmin() { return request.auth != null && request.auth.uid == 'ADMIN_UID'; }
+
+    match /works/{id}         { allow read: if true; allow write: if isAdmin(); }
+    match /works_private/{id} { allow read, write: if isAdmin(); }
+    match /settings/{id}      { allow read: if true; allow write: if isAdmin(); }
+
+    match /orders/{id} {
+      allow get: if true;            // العميل يتابع طلبه بالرابط (الـ ID صعب تخمينه)
+      allow list: if isAdmin();
+      allow create: if request.resource.data.keys().hasOnly(
+          ['workId','title','price','name','phone','receiptPath','status','createdAt'])
+        && request.resource.data.status == 'pending'
+        && request.resource.data.name is string && request.resource.data.name.size() <= 80
+        && request.resource.data.phone is string && request.resource.data.phone.size() <= 20;
+      allow update, delete: if isAdmin();
+    }
+  }
+}
